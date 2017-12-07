@@ -1,0 +1,95 @@
+﻿{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+  "parameters": {
+
+    "virtualMachineSize": {
+      "type": "string",
+      "defaultValue": "Standard_D2_v2"
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "VADMIN"
+    },
+    "virtualNetworkName": {
+      "type": "string",
+      "defaultValue": "VNET02"
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "Test@2016"
+    },
+    "sku": {
+      "type": "string",
+      "allowedValues": [
+        "2012-R2-Datacenter",
+        "2016-Datacenter",
+        "2008-R2-SP1"
+      ],
+      "defaultValue": "2012-R2-Datacenter"
+    },
+    "publicIpAddressType": {
+      "type": "string",
+      "defaultValue": "Dynamic"
+    },
+    "time": {
+      "type": "string",
+      "defaultValue": "23:00"
+    },
+    "vmTemplateURI": {
+      "type": "string",
+      "defaultValue": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-vm.json"
+    },
+    "dataDriveCount": {
+      "type": "int",
+      "minValue": 1,
+      "defaultValue": 1
+    },
+    "vnetTemplateURI": {
+      "type": "string",
+      "defaultValue": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/Base-vnet.json"
+    },
+    "GatewaySubnetPrefix": {
+      "type": "string"
+    },
+    "VNETPrefix": {
+      "type": "string"
+    },
+    "DC1-SubnetPrefix": {
+      "type": "string"
+    },
+    "VNETSubnet2Name": {
+      "type": "string"
+    },
+    "DC2-SubnetPrefix": {
+      "type": "string"
+    },
+    "_artifactsLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
+      }
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Auto-generated token to access _artifactsLocation"
+      }
+    }
+  },
+  "variables": {
+    "variables": {
+      "VMNames": [
+        "DC1",
+        "DC2"
+      ],
+      "vnetSubnetName": [
+        "DC1-Subnet",
+        "DC2-Subnet"
+      ]
+    },
+    "resources": [
+    ],
+    "outputs": {
+    }
+  }
