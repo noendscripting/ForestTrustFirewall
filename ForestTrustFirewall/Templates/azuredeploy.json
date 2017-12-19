@@ -36,18 +36,10 @@
       "type": "string",
       "defaultValue": "23:00"
     },
-    "vmTemplateURI": {
-      "type": "string",
-      "defaultValue": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-vm.json"
-    },
     "dataDriveCount": {
       "type": "int",
       "minValue": 1,
       "defaultValue": 1
-    },
-    "vnetTemplateURI": {
-      "type": "string",
-      "defaultValue": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/Base-vnet.json"
     },
     "GatewaySubnetPrefix": {
       "type": "string"
@@ -56,9 +48,6 @@
       "type": "string"
     },
     "DC1-SubnetPrefix": {
-      "type": "string"
-    },
-    "VNETSubnet2Name": {
       "type": "string"
     },
     "DC2-SubnetPrefix": {
@@ -77,19 +66,291 @@
       }
     }
   },
+
   "variables": {
-    "variables": {
-      "VMNames": [
-        "DC1",
-        "DC2"
-      ],
-      "vnetSubnetName": [
-        "DC1-Subnet",
-        "DC2-Subnet"
-      ]
-    },
-    "resources": [
+    "VMNames": [
+      "DC1",
+      "DC2"
     ],
+    "vnetSubnetName": [
+      "DC1-Subnet",
+      "DC2-Subnet"
+    ],
+    "NSGNames": [
+      "NSG-DC1",
+      "NSG-DC2"
+
+    ],
+    "vnetName": "VNET-FWLAB",
+    "VnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('VMNames'))]",
+    "subnetRef": [
+      "[concat(variables('vnetId'), '/subnets/', variables('vnetName')[0])]",
+      "[concat(variables('vnetId'), '/subnets/', variables('vnetName')[1])]"
+    ]
+    "DC1networkInterfaceName": "[concat(variables('VMNames')[0],'NIC')]",
+    "DC1publicIpAddressName": "[concat(variables('VMNames')[0],'PUBLICIP')]",
+    //"vmResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachineName'))]"
+
+  },
+  "resources": [
+    {
+      "name": "[variables('DC1publicIpAddressName')]",
+      "Type": "Microsoft.Network/publicIpAddresses",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "DCP1ublicIP"
+      },
+      "Properties": {
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+      }
+    },
+    // NSG DC1
+    {
+      "comments": "# NSG",
+      "name": "[variables('NSGNames')[0]]",
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NSG1"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "default-allow-rdp-in",
+            "properties": {
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1000,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "default-allow-winrm-in",
+            "properties": {
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5986",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1500,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    // NSG DC2
+    {
+      "comments": "# NSG",
+      "name": "[variables('NSGNames')[1]]",
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NSG2"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "default-allow-rdp-in",
+            "properties": {
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1000,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "default-allow-winrm-in",
+            "properties": {
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5986",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1500,
+              "direction": "Inbound"
+            }
+          }
+
+        ]
+      }
+    },
+    //VNET Settings
+    {
+      "name": "[variables('VNETname')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('NSGNames')[0])]",
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('NSGNames')[1])]"
+      ],
+      "tags": {
+        "displayName": "VNET"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('VNETPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "GatewaySubnet",
+            "properties": {
+              "addressPrefix": "[parameters('GatewaySubnetPrefix')]"
+
+            }
+          },
+          {
+            "name": "[variables('vnetSubnetName')[0]]",
+            "properties": {
+              "addressPrefix": "[parameters('DC1-SubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('NSGNames')[0])]"
+              }
+            }
+          },
+          {
+            "name": "[variables('vnetSubnetName')[1]]",
+            "properties": {
+              "addressPrefix": "[parameters('DC2-SubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('NSGNames')[0])]"
+              }
+            }
+
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('DC1networkInterfaceName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC1publicIpAddressName'))]"
+      ],
+      "tags": {
+        "displayName": "DC1NIC"
+      },
+      "properties": {
+        "primary": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnetRef')[0]]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIpAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC1publicIpAddressName'))]"
+              }
+            }
+          }
+        ]
+
+      }
+    },
+    {
+      "name": "[variables('VMNames')[0]]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
+      ],
+      "tags": {
+        "displayName": "BaseDC"
+      },
+      "properties": {
+        "osProfile": {
+          "computerName": "[variables('VMNames')[0]]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('virtualMachineSize')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "[parameters('sku')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+          "copy": [
+            {
+              "name": "DataDisks",
+              "count": "[parameters('dataDriveCount')]",
+              "input": {
+                "diskSizeGB": 20,
+                "lun": "[copyIndex('dataDisks')]",
+                "CreateOption": "Empty"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+            }
+          ]
+
+        }
+
+      } //,
+      //"resources": [
+      //  {
+      //    "name": "BuildConfig",
+      //    "type": "extensions",
+      //    "location": "[parameters('location')]",
+      //    "apiVersion": "2015-06-15",
+      //    "dependsOn": [
+      //      "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
+      //    ],
+      //    "tags": {
+      //      "displayName": "BuildConfig"
+      //    },
+      //    "properties": {
+      //      "publisher": "Microsoft.Compute",
+      //      "type": "CustomScriptExtension",
+      //      "typeHandlerVersion": "1.9",
+      //      "autoUpgradeMinorVersion": true,
+      //      "settings": {
+      //        "fileUris": [
+      //          "[concat(variables('StorageAccount'), '/', variables('BuildConfigScriptFolder'), '/', variables('BuildConfigScriptFileName'), parameters('sasKey'))]"
+      //        ],
+      //        "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('BuildConfigScriptFileName'))]"
+      //      }
+      //    }
+      //  }
+      //]
+    }
+
+
+
+  ],
     "outputs": {
     }
   }
