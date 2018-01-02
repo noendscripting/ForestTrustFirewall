@@ -82,17 +82,21 @@
 
     ],
     "vnetName": "VNET-FWLAB",
-    "VnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('VMNames'))]",
+    "VnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
     "subnetRef": [
-      "[concat(variables('vnetId'), '/subnets/', variables('vnetName')[0])]",
-      "[concat(variables('vnetId'), '/subnets/', variables('vnetName')[1])]"
-    ]
+      "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[0])]",
+      "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[1])]"
+    ],
     "DC1networkInterfaceName": "[concat(variables('VMNames')[0],'NIC')]",
     "DC1publicIpAddressName": "[concat(variables('VMNames')[0],'PUBLICIP')]",
-    //"vmResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachineName'))]"
+    "DC2publicIpAddressName": "[concat(variables('VMNames')[1],'PUBLICIP')]",
+    "DC2networkInterfaceName": "[concat(variables('VMNames')[1],'NIC')]",
+    "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
+    "DNSServerIP": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]"
 
   },
   "resources": [
+    //DC1 Public IP
     {
       "name": "[variables('DC1publicIpAddressName')]",
       "Type": "Microsoft.Network/publicIpAddresses",
@@ -100,6 +104,18 @@
       "location": "[resourceGroup().location]",
       "tags": {
         "displayName": "DCP1ublicIP"
+      },
+      "Properties": {
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+      }
+    },
+    {
+      "name": "[variables('DC2publicIpAddressName')]",
+      "Type": "Microsoft.Network/publicIpAddresses",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "DCP2ublicIP"
       },
       "Properties": {
         "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
@@ -142,6 +158,19 @@
               "priority": 1500,
               "direction": "Inbound"
             }
+          },
+          {
+            "name": "allow-dns-in-vnet-only",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "53",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1600,
+              "direction": "Inbound"
+            }
           }
         ]
       }
@@ -182,6 +211,19 @@
               "access": "Allow",
               "priority": 1500,
               "direction": "Inbound"
+            }
+          },
+          {
+            "name": "allow-dns-out-vnet-only",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "53",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1600,
+              "direction": "Outbound"
             }
           }
 
@@ -237,13 +279,15 @@
         ]
       }
     },
+    //DC1 NIC
     {
       "name": "[variables('DC1networkInterfaceName')]",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC1publicIpAddressName'))]"
+        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC1publicIpAddressName'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]"
       ],
       "tags": {
         "displayName": "DC1NIC"
@@ -257,7 +301,8 @@
               "subnet": {
                 "id": "[variables('subnetRef')[0]]"
               },
-              "privateIPAllocationMethod": "Dynamic",
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[variables('DNSServerIP')]",
               "publicIpAddress": {
                 "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC1publicIpAddressName'))]"
               }
@@ -268,15 +313,49 @@
       }
     },
     {
+      "name": "[variables('DC2networkInterfaceName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC2publicIpAddressName'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
+      ],
+      "tags": {
+        "displayName": "DC2NIC"
+      },
+      "properties": {
+        "primary": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnetRef')[0]]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIpAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC2publicIpAddressName'))]"
+              }
+            }
+          }
+        ],
+        "dnsSettings": {
+          "dnsServers": [ "[reference(variables('DC1networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]" ]
+        }
+      }
+    },
+    {
       "name": "[variables('VMNames')[0]]",
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2017-03-30",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
       ],
       "tags": {
-        "displayName": "BaseDC"
+        "displayName": "DC1"
       },
       "properties": {
         "osProfile": {
@@ -313,7 +392,85 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('DC1networkInterfaceName'))]"
+            }
+          ]
+
+        }
+
+      } //,
+      //"resources": [
+      //  {
+      //    "name": "BuildConfig",
+      //    "type": "extensions",
+      //    "location": "[parameters('location')]",
+      //    "apiVersion": "2015-06-15",
+      //    "dependsOn": [
+      //      "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
+      //    ],
+      //    "tags": {
+      //      "displayName": "BuildConfig"
+      //    },
+      //    "properties": {
+      //      "publisher": "Microsoft.Compute",
+      //      "type": "CustomScriptExtension",
+      //      "typeHandlerVersion": "1.9",
+      //      "autoUpgradeMinorVersion": true,
+      //      "settings": {
+      //        "fileUris": [
+      //          "[concat(variables('StorageAccount'), '/', variables('BuildConfigScriptFolder'), '/', variables('BuildConfigScriptFileName'), parameters('sasKey'))]"
+      //        ],
+      //        "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('BuildConfigScriptFileName'))]"
+      //      }
+      //    }
+      //  }
+      //]
+    },
+    {
+      "name": "[variables('VMNames')[1]]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkInterfaces/', variables('DC2networkInterfaceName'))]"
+      ],
+      "tags": {
+        "displayName": "DC2"
+      },
+      "properties": {
+        "osProfile": {
+          "computerName": "[variables('VMNames')[1]]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('virtualMachineSize')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "[parameters('sku')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+                
+          "DataDisks": [
+            {
+              "diskSizeGB": 20,
+              "lun": 0,
+              "CreateOption": "Empty"
+            }
+              
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('DC2networkInterfaceName'))]"
             }
           ]
 
@@ -347,7 +504,6 @@
       //  }
       //]
     }
-
 
 
   ],
