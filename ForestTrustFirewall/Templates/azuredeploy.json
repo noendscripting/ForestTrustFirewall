@@ -64,6 +64,28 @@
       "metadata": {
         "description": "Auto-generated token to access _artifactsLocation"
       }
+    },
+    "DCConfig1UpdateTagVersion": {
+      "type": "string",
+      "defaultValue": "1.0",
+      "metadata": {
+        "description": "This value must be changed from a previous deployment to ensure the extension will run"
+      }
+    },
+    "DCConfig2UpdateTagVersion": {
+      "type": "string",
+      "defaultValue": "1.0",
+      "metadata": {
+        "description": "This value must be changed from a previous deployment to ensure the extension will run"
+      }
+    },
+    "domain1Name": {
+      "type": "string",
+      "defaultValue": "contosoad.com"
+    },
+    "NetBiosDomain1name": {
+      "type": "string",
+      "defaultValue": "contosoad"
     }
   },
 
@@ -92,7 +114,12 @@
     "DC2publicIpAddressName": "[concat(variables('VMNames')[1],'PUBLICIP')]",
     "DC2networkInterfaceName": "[concat(variables('VMNames')[1],'NIC')]",
     "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
-    "DNSServerIP": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]"
+    "DC2SubnetIPArray": "[split(parameters('DC2-SubnetPrefix'),'.')]",
+    "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
+    "DNSServerIP2": "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','4')]",
+    "DCConfigArchiveFolder": "DSC",
+    "DCConfigArchiveFileName": "DCConfig1.zip",
+    "DCConfigDataFileName": "ConfigDataAD.psd"
 
   },
   "resources": [
@@ -160,16 +187,29 @@
             }
           },
           {
-            "name": "allow-dns-in-vnet-only",
+            "name": "allow-in-vnet-only",
             "properties": {
               "protocol": "*",
               "sourcePortRange": "*",
-              "destinationPortRange": "53",
+              "destinationPortRange": "*",
               "sourceAddressPrefix": "VirtualNetwork",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1600,
               "direction": "Inbound"
+            }
+          },
+          {
+            "name": "allow-out-vnet-only",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1700,
+              "direction": "Outbound"
             }
           }
         ]
@@ -214,15 +254,28 @@
             }
           },
           {
-            "name": "allow-dns-out-vnet-only",
+            "name": "allow-in-vnet-only",
             "properties": {
               "protocol": "*",
               "sourcePortRange": "*",
-              "destinationPortRange": "53",
+              "destinationPortRange": "*",
               "sourceAddressPrefix": "VirtualNetwork",
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1600,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "allow-out-vnet-only",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1700,
               "direction": "Outbound"
             }
           }
@@ -302,7 +355,7 @@
                 "id": "[variables('subnetRef')[0]]"
               },
               "privateIPAllocationMethod": "Static",
-              "privateIPAddress": "[variables('DNSServerIP')]",
+              "privateIPAddress": "[variables('DNSServerIP1')]",
               "publicIpAddress": {
                 "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC1publicIpAddressName'))]"
               }
@@ -334,7 +387,8 @@
               "subnet": {
                 "id": "[variables('subnetRef')[0]]"
               },
-              "privateIPAllocationMethod": "Dynamic",
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[variables('DNSServerIP2')]",
               "publicIpAddress": {
                 "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC2publicIpAddressName'))]"
               }
@@ -398,7 +452,52 @@
 
         }
 
-      } //,
+      },
+        "resources": [
+            {
+                "name": "Microsoft.Powershell.DSC",
+                "type": "extensions",
+                "location": "[resourceGroup().location]",
+                "apiVersion": "2015-06-15",
+                "dependsOn": [
+                    "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]"
+                ],
+                "tags": {
+                    "displayName": "DCConfig1"
+                },
+                "properties": {
+                    "publisher": "Microsoft.Powershell",
+                    "type": "DSC",
+                    "typeHandlerVersion": "2.9",
+                    "autoUpgradeMinorVersion": true,
+                    "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
+                    "settings": {
+                        "configuration": {
+                            "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigArchiveFileName'))]",
+                            "script": "DCConfig.ps1",
+                            "function": "Main"
+                        },
+                      "configurationArguments": {
+                        "nodeName": "localhost",
+                        "domainName": "[parameters('domain1Name')]",
+                        "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
+                        "DomainAdminCredentials": {
+                          "UserName": "[parameters('AdminUserName')]",
+                          "Password": "PrivateSettingsRef:DomainAdminPassword"
+                        },
+                        "configurationData": {
+                          "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigDataFileName'))]"
+                        }
+
+                      }
+                    },
+                  "protectedSettings": {
+                    "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]",
+                    "DomainAdminPassword": "[parameters('AdminPassword')]"
+                  }
+                }
+            }
+        ] //,
       //"resources": [
       //  {
       //    "name": "BuildConfig",
@@ -476,7 +575,41 @@
 
         }
 
-      } //,
+      },
+        "resources": [
+            //{
+            //    "name": "Microsoft.Powershell.DSC",
+            //    "type": "extensions",
+            //    "location": "[resourceGroup().location]",
+            //    "apiVersion": "2015-06-15",
+            //    "dependsOn": [
+            //        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
+            //    ],
+            //    "tags": {
+            //        "displayName": "DCConfig2"
+            //    },
+            //    "properties": {
+            //        "publisher": "Microsoft.Powershell",
+            //        "type": "DSC",
+            //        "typeHandlerVersion": "2.9",
+            //        "autoUpgradeMinorVersion": true,
+            //        "forceUpdateTag": "[parameters('DCConfig2UpdateTagVersion')]",
+            //        "settings": {
+            //            "configuration": {
+            //                "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigArchiveFileName'))]",
+            //                "script": "DCConfig.ps1",
+            //                "function": "Main"
+            //            },
+            //            "configurationArguments": {
+            //                "nodeName": "[variables('VMNames')[1]]"
+            //            }
+            //        },
+            //        "protectedSettings": {
+            //            "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]"
+            //        }
+            //    }
+            //}
+        ] //,
       //"resources": [
       //  {
       //    "name": "BuildConfig",
