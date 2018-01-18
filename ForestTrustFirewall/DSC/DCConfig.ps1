@@ -5,16 +5,18 @@ Configuration DcConfig
 	Param
 	(
 		[string]$NodeName = 'localhost',
+		[Parameter(Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
 		[PSCredential]$DomainAdminCredentials,
         [string]$DomainName,
 		[string]$NetBiosDomainname,
-		[string] $nodeName = "localhost",
-    	[string] $DataDiskNumber,
-		[string] $DataDriveLetter
+    	[string]$DataDiskNumber,
+		[string]$DataDriveLetter
 
 	)
 
-	Import-DscResource -ModuleName PSDesiredStateConfiguration, xActiveDirectory, xStorage, xComputerManagement, xAdcsDeployment,xNetworking, xTimeZone
+	Import-DscResource -ModuleName PSDesiredStateConfiguration, xActiveDirectory, xStorage, xComputerManagement,xNetworking, xTimeZone
+	
 
 
 	Node $nodeName
@@ -26,6 +28,13 @@ Configuration DcConfig
 			ActionAfterReboot = 'ContinueConfiguration'
 			AllowModuleOverwrite = $true
 		}
+		xTimeZone TimeZoneExample
+
+        {
+			isSingleInstance = 'Yes'
+            TimeZone = 'Eastern Standard Time'
+
+        }
 
 		WindowsFeature DNS_RSAT
 		{ 
@@ -90,19 +99,11 @@ Configuration DcConfig
 			DomainName = $DomainName            
 			DomainAdministratorCredential = $DomainAdminCredentials
 			SafemodeAdministratorPassword = $DomainAdminCredentials
-			#DnsDelegationCredential = $DomainAdminCredentials
 			DomainNetbiosName = $NetBiosDomainname
-			DatabasePath = $Node.DataDriveLetter + ":\NTDS"
-			LogPath = $Node.DataDriveLetter + ":\NTDS"
-			SysvolPath = $Node.DataDriveLetter + ":\SYSVOL"
+			DataBasePath = "$($DataDriveLetter):\NTDS"
+			LogPath = "$($DataDriveLetter):\NTDS"
+			SysvolPath = "$($DataDriveLetter):\SYSVOL"
 			DependsOn = '[xDisk]Data_Disk', '[WindowsFeature]ADDS_Install'
-		}
-		
-		WindowsFeature RSAT_ADCS
-		{
-			Ensure='Present'
-			Name='RSAT-ADCS'
-			DependsOn='[xADDomain]CreateForest'
 		}
 	}
 }

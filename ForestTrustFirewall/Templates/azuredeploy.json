@@ -118,8 +118,10 @@
     "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
     "DNSServerIP2": "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','4')]",
     "DCConfigArchiveFolder": "DSC",
-    "DCConfigArchiveFileName": "DCConfig1.zip",
-    "DCConfigDataFileName": "ConfigDataAD.psd"
+    "DCConfigArchiveFileName": "dsc.zip",
+    "DCConfigDataFileName": "DCConfig.psd1",
+    "DcDscConfigurationFunction": "DCConfig.ps1\\DcConfig",
+    "projectName": "ForestTrustFirewall"
 
   },
   "resources": [
@@ -209,6 +211,19 @@
               "destinationAddressPrefix": "VirtualNetwork",
               "access": "Allow",
               "priority": 1700,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "allow-out-443-internet",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "Internet",
+              "access": "Allow",
+              "priority": 1800,
               "direction": "Outbound"
             }
           }
@@ -372,8 +387,8 @@
       "location": "[resourceGroup().location]",
       "dependsOn": [
         "[concat('Microsoft.Network/publicIpAddresses/',variables('DC2publicIpAddressName'))]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
-        "[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]"//,
+        //"[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
       ],
       "tags": {
         "displayName": "DC2NIC"
@@ -385,7 +400,7 @@
             "name": "ipconfig1",
             "properties": {
               "subnet": {
-                "id": "[variables('subnetRef')[0]]"
+                "id": "[variables('subnetRef')[1]]"
               },
               "privateIPAllocationMethod": "Static",
               "privateIPAddress": "[variables('DNSServerIP2')]",
@@ -465,37 +480,35 @@
                 "tags": {
                     "displayName": "DCConfig1"
                 },
-                "properties": {
-                    "publisher": "Microsoft.Powershell",
-                    "type": "DSC",
-                    "typeHandlerVersion": "2.9",
-                    "autoUpgradeMinorVersion": true,
-                    "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
-                    "settings": {
-                        "configuration": {
-                            "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigArchiveFileName'))]",
-                            "script": "DCConfig.ps1",
-                            "function": "Main"
-                        },
-                      "configurationArguments": {
-                        "nodeName": "localhost",
-                        "domainName": "[parameters('domain1Name')]",
-                        "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
-                        "DomainAdminCredentials": {
-                          "UserName": "[parameters('AdminUserName')]",
-                          "Password": "PrivateSettingsRef:DomainAdminPassword"
-                        },
-                        "configurationData": {
-                          "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigDataFileName'))]"
-                        }
-
-                      }
+              "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "2.13",
+                "autoUpgradeMinorVersion": true,
+                "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
+                "settings": {
+                  "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', 'dsc.zip')]",
+                  "sasToken": "[parameters('_artifactsLocationSasToken')]",
+                  "configurationFunction": "[variables('DcDscConfigurationFunction')]",
+                  "properties": {
+                    "nodeName": "localhost",
+                    "domainName": "[parameters('domain1Name')]",
+                    "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
+                    "DomainAdminCredentials": {
+                      "UserName": "[parameters('AdminUserName')]",
+                      "Password": "PrivateSettingsRef:DomainAdminPassword"
                     },
-                  "protectedSettings": {
-                    "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]",
+                    "DataDiskNumber": "2",
+                    "DataDriveLetter": "F"
+                  }
+                },
+                "protectedSettings": {
+                  "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
+                  "items": {
                     "DomainAdminPassword": "[parameters('AdminPassword')]"
                   }
                 }
+              }
             }
         ] //,
       //"resources": [
