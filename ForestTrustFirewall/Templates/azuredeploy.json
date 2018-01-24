@@ -67,14 +67,14 @@
     },
     "DCConfig1UpdateTagVersion": {
       "type": "string",
-      "defaultValue": "1.0",
+      "defaultValue": "1.4",
       "metadata": {
         "description": "This value must be changed from a previous deployment to ensure the extension will run"
       }
     },
     "DCConfig2UpdateTagVersion": {
       "type": "string",
-      "defaultValue": "1.0",
+      "defaultValue": "1.4",
       "metadata": {
         "description": "This value must be changed from a previous deployment to ensure the extension will run"
       }
@@ -86,13 +86,23 @@
     "NetBiosDomain1name": {
       "type": "string",
       "defaultValue": "contosoad"
+    },
+    "domain2Name": {
+      "type": "string",
+      "defaultValue": "fabrikam.com"
+    },
+    "NetBiosDomain2name": {
+      "type": "string",
+      "defaultValue": "fabrikam"
     }
   },
 
   "variables": {
     "VMNames": [
       "DC1",
-      "DC2"
+      "DC2",
+      "FIM1",
+      "ADMT"
     ],
     "vnetSubnetName": [
       "DC1-Subnet",
@@ -113,6 +123,10 @@
     "DC1publicIpAddressName": "[concat(variables('VMNames')[0],'PUBLICIP')]",
     "DC2publicIpAddressName": "[concat(variables('VMNames')[1],'PUBLICIP')]",
     "DC2networkInterfaceName": "[concat(variables('VMNames')[1],'NIC')]",
+    "FIM1publicIpAddressName": "[concat(variables('VMNames')[2],'PUBLICIP')]",
+    "FIM1networkInterfaceName": "[concat(variables('VMNames')[2],'NIC')]",
+    "ADMTpublicIpAddressName": "[concat(variables('VMNames')[3],'PUBLICIP')]",
+    "ADMTnetworkInterfaceName": "[concat(variables('VMNames')[3],'NIC')]",
     "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
     "DC2SubnetIPArray": "[split(parameters('DC2-SubnetPrefix'),'.')]",
     "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
@@ -120,8 +134,18 @@
     "DCConfigArchiveFolder": "DSC",
     "DCConfigArchiveFileName": "dsc.zip",
     "DCConfigDataFileName": "DCConfig.psd1",
-    "DcDscConfigurationFunction": "DCConfig.ps1\\DcConfig",
-    "projectName": "ForestTrustFirewall"
+    "Dc1DscConfigurationFunction": "DC1Config.ps1\\DcConfig",
+    "Dc2DscConfigurationFunction": "DC1Config.ps1\\DcConfig",
+    "projectName": "ForestTrustFirewall",
+    "CustomScriptScriptFolder": "CustomScripts",
+    "CustomScriptScriptFileName": "CustomScript.ps1",
+    "CustomScriptScriptContent": [
+      "contosoad-Users.csv",
+      "fabrikam-users.csv",
+      "Groups.csv",
+      "Members.csv",
+      "OUs.csv"
+    ]
 
   },
   "resources": [
@@ -135,9 +159,14 @@
         "displayName": "DCP1ublicIP"
       },
       "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(toLower(variables('VMNames')[0]),'access101')]"
+        }
+
       }
     },
+    //DC2 Public IP
     {
       "name": "[variables('DC2publicIpAddressName')]",
       "Type": "Microsoft.Network/publicIpAddresses",
@@ -147,7 +176,42 @@
         "displayName": "DCP2ublicIP"
       },
       "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(toLower(variables('VMNames')[1]),'access101')]"
+        }
+      }
+    },
+    //FIM1 Public IP
+    {
+      "name": "[variables('FIM1publicIpAddressName')]",
+      "Type": "Microsoft.Network/publicIpAddresses",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "FIM1PublicIP"
+      },
+      "Properties": {
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(toLower(variables('VMNames')[2]),'access101')]"
+        }
+      }
+    },
+    //ADMT Public IP
+    {
+      "name": "[variables('ADMTpublicIpAddressName')]",
+      "Type": "Microsoft.Network/publicIpAddresses",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "ADMTPublicIP"
+      },
+      "Properties": {
+        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(toLower(variables('VMNames')[3]),'access101')]"
+        }
       }
     },
     // NSG DC1
@@ -387,7 +451,7 @@
       "location": "[resourceGroup().location]",
       "dependsOn": [
         "[concat('Microsoft.Network/publicIpAddresses/',variables('DC2publicIpAddressName'))]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]"//,
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]" //,
         //"[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
       ],
       "tags": {
@@ -409,12 +473,76 @@
               }
             }
           }
+        ]
+      }
+    },
+    {
+      "name": "[variables('FIM1networkInterfaceName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+        "[concat('Microsoft.Network/publicIpAddresses/',variables('FIM1publicIpAddressName'))]"
+      ],
+      "tags": {
+        "displayName": "FIM1"
+      },
+      "properties": {
+        "primary": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnetRef')[1]]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIpAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('FIM1publicIpAddressName'))]"
+              }
+            }
+          }
+        ],
+        "dnsSettings": {
+          "dnsServers": [ "[reference(variables('DC2networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]" ]
+        }
+      }
+    },
+    {
+      "name": "[variables('ADMTnetworkInterfaceName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIpAddresses/', variables('ADMTpublicIpAddressName'))]"
+      ],
+      "tags": {
+        "displayName": "BaseVMNIC"
+      },
+      "properties": {
+        "primary": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnetRef')[0]]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIpAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('ADMTpublicIpAddressName'))]"
+              }
+            }
+          }
         ],
         "dnsSettings": {
           "dnsServers": [ "[reference(variables('DC1networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]" ]
         }
+
       }
     },
+    //DC1
     {
       "name": "[variables('VMNames')[0]]",
       "type": "Microsoft.Compute/virtualMachines",
@@ -468,76 +596,84 @@
         }
 
       },
-        "resources": [
-            {
-                "name": "Microsoft.Powershell.DSC",
-                "type": "extensions",
-                "location": "[resourceGroup().location]",
-                "apiVersion": "2015-06-15",
-                "dependsOn": [
-                    "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]"
-                ],
-                "tags": {
-                    "displayName": "DCConfig1"
-                },
+      "resources": [
+        {
+          "name": "DCConfig1",
+          "type": "extensions",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2015-06-15",
+          "dependsOn": [
+            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]",
+            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
+          ],
+          "tags": {
+            "displayName": "DCConfig1"
+          },
+          "properties": {
+            "publisher": "Microsoft.Powershell",
+            "type": "DSC",
+            "typeHandlerVersion": "2.13",
+            "autoUpgradeMinorVersion": true,
+            "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
+            "settings": {
+              "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', 'dsc.zip')]",
+              "sasToken": "[parameters('_artifactsLocationSasToken')]",
+              "configurationFunction": "[variables('Dc1DscConfigurationFunction')]",
               "properties": {
-                "publisher": "Microsoft.Powershell",
-                "type": "DSC",
-                "typeHandlerVersion": "2.13",
-                "autoUpgradeMinorVersion": true,
-                "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
-                "settings": {
-                  "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', 'dsc.zip')]",
-                  "sasToken": "[parameters('_artifactsLocationSasToken')]",
-                  "configurationFunction": "[variables('DcDscConfigurationFunction')]",
-                  "properties": {
-                    "nodeName": "localhost",
-                    "domainName": "[parameters('domain1Name')]",
-                    "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
-                    "DomainAdminCredentials": {
-                      "UserName": "[parameters('AdminUserName')]",
-                      "Password": "PrivateSettingsRef:DomainAdminPassword"
-                    },
-                    "DataDiskNumber": "2",
-                    "DataDriveLetter": "F"
-                  }
+                "nodeName": "localhost",
+                "domainName": "[parameters('domain1Name')]",
+                "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
+                "DomainAdminCredentials": {
+                  "UserName": "[parameters('AdminUserName')]",
+                  "Password": "PrivateSettingsRef:DomainAdminPassword"
                 },
-                "protectedSettings": {
-                  "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
-                  "items": {
-                    "DomainAdminPassword": "[parameters('AdminPassword')]"
-                  }
-                }
+                "DataDiskNumber": "2",
+                "DataDriveLetter": "F",
+                "ForwarderIPaddress": "[reference(variables('DC2networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]",
+                "ForwarderDomain": "[parameters('domain2Name')]"
+              }
+            },
+            "protectedSettings": {
+              "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
+              "items": {
+                "DomainAdminPassword": "[parameters('AdminPassword')]"
               }
             }
-        ] //,
-      //"resources": [
-      //  {
-      //    "name": "BuildConfig",
-      //    "type": "extensions",
-      //    "location": "[parameters('location')]",
-      //    "apiVersion": "2015-06-15",
-      //    "dependsOn": [
-      //      "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
-      //    ],
-      //    "tags": {
-      //      "displayName": "BuildConfig"
-      //    },
-      //    "properties": {
-      //      "publisher": "Microsoft.Compute",
-      //      "type": "CustomScriptExtension",
-      //      "typeHandlerVersion": "1.9",
-      //      "autoUpgradeMinorVersion": true,
-      //      "settings": {
-      //        "fileUris": [
-      //          "[concat(variables('StorageAccount'), '/', variables('BuildConfigScriptFolder'), '/', variables('BuildConfigScriptFileName'), parameters('sasKey'))]"
-      //        ],
-      //        "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('BuildConfigScriptFileName'))]"
-      //      }
-      //    }
-      //  }
-      //]
+          }
+        },
+        {
+          "name": "ImportDC1",
+          "type": "extensions",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2016-03-30",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', variables('VMNames')[0])]",
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[0],'/extensions/DCConfig1')]"
+          ],
+          "tags": {
+            "displayName": "DC1ImportScript"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "CustomScriptExtension",
+            "typeHandlerVersion": "1.4",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "fileUris": [
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'), parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4], parameters('_artifactsLocationSasToken'))]"
+              ],
+              "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('projectName'),'/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]"
+            }
+          }
+        }
+      ]
     },
+    //DC2
     {
       "name": "[variables('VMNames')[1]]",
       "type": "Microsoft.Compute/virtualMachines",
@@ -569,14 +705,14 @@
             "createOption": "FromImage",
             "caching": "ReadWrite"
           },
-                
+
           "DataDisks": [
             {
               "diskSizeGB": 20,
               "lun": 0,
               "CreateOption": "Empty"
             }
-              
+
           ]
         },
         "networkProfile": {
@@ -589,68 +725,257 @@
         }
 
       },
-        "resources": [
-            //{
-            //    "name": "Microsoft.Powershell.DSC",
-            //    "type": "extensions",
-            //    "location": "[resourceGroup().location]",
-            //    "apiVersion": "2015-06-15",
-            //    "dependsOn": [
-            //        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
-            //    ],
-            //    "tags": {
-            //        "displayName": "DCConfig2"
-            //    },
-            //    "properties": {
-            //        "publisher": "Microsoft.Powershell",
-            //        "type": "DSC",
-            //        "typeHandlerVersion": "2.9",
-            //        "autoUpgradeMinorVersion": true,
-            //        "forceUpdateTag": "[parameters('DCConfig2UpdateTagVersion')]",
-            //        "settings": {
-            //            "configuration": {
-            //                "url": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFolder'), '/', variables('DCConfigArchiveFileName'))]",
-            //                "script": "DCConfig.ps1",
-            //                "function": "Main"
-            //            },
-            //            "configurationArguments": {
-            //                "nodeName": "[variables('VMNames')[1]]"
-            //            }
-            //        },
-            //        "protectedSettings": {
-            //            "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]"
-            //        }
-            //    }
-            //}
-        ] //,
-      //"resources": [
-      //  {
-      //    "name": "BuildConfig",
-      //    "type": "extensions",
-      //    "location": "[parameters('location')]",
-      //    "apiVersion": "2015-06-15",
-      //    "dependsOn": [
-      //      "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
-      //    ],
-      //    "tags": {
-      //      "displayName": "BuildConfig"
-      //    },
-      //    "properties": {
-      //      "publisher": "Microsoft.Compute",
-      //      "type": "CustomScriptExtension",
-      //      "typeHandlerVersion": "1.9",
-      //      "autoUpgradeMinorVersion": true,
-      //      "settings": {
-      //        "fileUris": [
-      //          "[concat(variables('StorageAccount'), '/', variables('BuildConfigScriptFolder'), '/', variables('BuildConfigScriptFileName'), parameters('sasKey'))]"
-      //        ],
-      //        "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('BuildConfigScriptFileName'))]"
-      //      }
-      //    }
-      //  }
-      //]
-    }
+      "resources": [
+        {
+          "name": "DCConfig2",
+          "type": "extensions",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2015-06-15",
+          "dependsOn": [
+            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
+          ],
+          "tags": {
+            "displayName": "DCConfig2"
+          },
+          "properties": {
+            "publisher": "Microsoft.Powershell",
+            "type": "DSC",
+            "typeHandlerVersion": "2.9",
+            "autoUpgradeMinorVersion": true,
+            "forceUpdateTag": "[parameters('DCConfig2UpdateTagVersion')]",
+            "settings": {
+              "DCConfigArchiveFileName": "dsc.zip",
+              "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFileName'))]",
+              "sasToken": "[parameters('_artifactsLocationSasToken')]",
+              "configurationFunction": "[variables('Dc2DscConfigurationFunction')]",
+              "properties": {
+                "nodeName": "localhost",
+                "domainName": "[parameters('domain2Name')]",
+                "NetBiosDomainname": "[parameters('NetBiosDomain2name')]",
+                "DomainAdminCredentials": {
+                  "UserName": "[parameters('AdminUserName')]",
+                  "Password": "PrivateSettingsRef:DomainAdminPassword"
+                },
+                "DataDiskNumber": "2",
+                "DataDriveLetter": "F",
+                "ForwarderIPaddress": "[reference(variables('DC1networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]",
+                "ForwarderDomain": "[parameters('domain1Name')]"
+              }
+            },
+            "protectedSettings": {
+              "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
+              "items": {
+                "DomainAdminPassword": "[parameters('AdminPassword')]"
+              }
+            }
+          }
+        },
+        {
+          "name": "ImportDC2",
+          "type": "extensions",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2016-03-30",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines', variables('VMNames')[1])]",
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[1],'/extensions/DCConfig2')]"
+          ],
+          "tags": {
+            "displayName": "DC2ImportScript"
+          },
+          "properties": {
+            "publisher": "Microsoft.Compute",
+            "type": "CustomScriptExtension",
+            "typeHandlerVersion": "1.4",
+            "autoUpgradeMinorVersion": true,
+            "settings": {
+              "fileUris": [
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'), parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3], parameters('_artifactsLocationSasToken'))]",
+                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4], parameters('_artifactsLocationSasToken'))]"
+              ],
+              "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('projectName'),'/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]"
+            }
+          }
+        }
+      ]
+    },
+    //FIM1
+    {
+      "name": "[variables('VMNames')[2]]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkInterfaces/', variables('FIM1networkInterfaceName'))]"
+      ],
+      "tags": {
+        "displayName": "FIM1"
+      },
+      "properties": {
+        "osProfile": {
+          "computerName": "[variables('VMNames')[2]]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVmAgent": "true"
+          }
+        },
+        "hardwareProfile": {
+          "vmSize": "Standard_DS3_v2"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftSQLServer",
+            "offer": "SQL2012SP3-WS2012R2",
+            "sku": "Standard",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+          "copy": [
+            {
+              "name": "DataDisks",
+              "count": "[parameters('dataDriveCount')]",
+              "input": {
+                "diskSizeGB": 100,
+                "lun": "[copyIndex('dataDisks')]",
+                "CreateOption": "Empty"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('FIM1networkInterfaceName'))]"
+            }
+          ]
 
+        }
+
+      },
+      "resources": [
+        // Join domain - Json AD Domain Extension
+        {
+          "comments": "Join domain - JsonADDomainExtension",
+          "apiVersion": "2015-06-15",
+          "type": "extensions",
+          "name": "joinDomain",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[2])]",
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[1],'/extensions/DCConfig2')]"
+          ],
+          "properties": {
+            "publisher": "Microsoft.Compute",
+
+            "type": "JsonADDomainExtension",
+            "typeHandlerVersion": "1.0",
+            "settings": {
+              "Name": "[parameters('domain2Name')]",
+              "User": "[concat(parameters('domain2Name'),'\\', parameters('AdminUserName'))]",
+              "Restart": "true",
+              "Options": 3
+            },
+            "protectedsettings": {
+              "Password": "[parameters('AdminPassword')]"
+            }
+          }
+        }
+      ]
+    },
+    //ADMT1
+    {
+      "name": "[variables('VMNames')[3]]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkInterfaces/', variables('ADMTnetworkInterfaceName'))]"
+      ],
+      "tags": {
+        "displayName": "ADMT"
+      },
+      "properties": {
+        "osProfile": {
+          "computerName": "[variables('VMNames')[3]]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVmAgent": "true"
+          }
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('virtualMachineSize')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "[parameters('sku')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+          "copy": [
+            {
+              "name": "DataDisks",
+              "count": "[parameters('dataDriveCount')]",
+              "input": {
+                "diskSizeGB": 20,
+                "lun": "[copyIndex('dataDisks')]",
+                "CreateOption": "Empty"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('ADMTnetworkInterfaceName'))]"
+            }
+          ]
+
+        }
+
+      },
+      "resources": [
+        // Join domain - Json AD Domain Extension
+        {
+          "comments": "Join domain - JsonADDomainExtension",
+          "apiVersion": "2015-06-15",
+          "type": "extensions",
+          "name": "joinDomain",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[3])]",
+            "[concat('Microsoft.Compute/virtualMachines/',variables('VMNames')[0],'/extensions/DCConfig1')]"
+          ],
+          "properties": {
+            "publisher": "Microsoft.Compute",
+
+            "type": "JsonADDomainExtension",
+            "typeHandlerVersion": "1.0",
+            "settings": {
+              "Name": "[parameters('domain2Name')]",
+              "User": "[concat(parameters('domain1Name'),'\\', parameters('AdminUserName'))]",
+              "Restart": "true",
+              "Options": 3
+            },
+            "protectedsettings": {
+              "Password": "[parameters('AdminPassword')]"
+            }
+          }
+        }
+      ]
+    }
 
   ],
     "outputs": {
