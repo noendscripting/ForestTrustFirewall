@@ -68,7 +68,7 @@
     "repositoryPath": {
       "type": "string",
       "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/master"
-    }
+    },
     "DCConfig1UpdateTagVersion": {
       "type": "string",
       "defaultValue": "1.4",
