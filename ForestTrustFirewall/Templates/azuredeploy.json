@@ -65,6 +65,10 @@
         "description": "Auto-generated token to access _artifactsLocation"
       }
     },
+    "repositoryPath": {
+      "type": "string",
+      "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/master"
+    }
     "DCConfig1UpdateTagVersion": {
       "type": "string",
       "defaultValue": "1.4",
@@ -634,7 +638,7 @@
               }
             },
             "protectedSettings": {
-              "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
+              "dataBlobUri": "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]",
               "items": {
                 "DomainAdminPassword": "[parameters('AdminPassword')]"
               }
@@ -660,12 +664,12 @@
             "autoUpgradeMinorVersion": true,
             "settings": {
               "fileUris": [
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'), parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4], parameters('_artifactsLocationSasToken'))]"
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4])]"
               ],
               "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('projectName'),'/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]"
             }
@@ -763,7 +767,7 @@
               }
             },
             "protectedSettings": {
-              "dataBlobUri": "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'), parameters('_artifactsLocationSasToken'))]",
+              "dataBlobUri": "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]",
               "items": {
                 "DomainAdminPassword": "[parameters('AdminPassword')]"
               }
@@ -789,12 +793,12 @@
             "autoUpgradeMinorVersion": true,
             "settings": {
               "fileUris": [
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'), parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3], parameters('_artifactsLocationSasToken'))]",
-                "[concat(parameters('_artifactsLocation'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4], parameters('_artifactsLocationSasToken'))]"
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[0])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[1])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[2])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[3])]",
+                "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptContent')[4])]"
               ],
               "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ', variables('projectName'),'/', variables('CustomScriptScriptFolder'), '/', variables('CustomScriptScriptFileName'))]"
             }
