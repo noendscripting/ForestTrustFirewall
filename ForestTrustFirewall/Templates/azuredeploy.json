@@ -621,7 +621,7 @@
             "autoUpgradeMinorVersion": true,
             "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
             "settings": {
-              "Configuration":{
+              "configuration":{
                 "uri":"[concat(parameters('_artifactsLocation'), 'dsc.zip')]",
                 "script":"DC1Config.ps1",
                 "function":"DCConfig"
