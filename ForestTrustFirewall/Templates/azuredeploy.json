@@ -57,7 +57,8 @@
       "type": "string",
       "metadata": {
         "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
-      }
+      },
+      "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/azdevops1.0/ForestTrustFirewall/DSC/"
     },
     "_artifactsLocationSasToken": {
       "type": "securestring",
