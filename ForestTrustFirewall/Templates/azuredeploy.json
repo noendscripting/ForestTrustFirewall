@@ -606,7 +606,7 @@
           "name": "DCConfig1",
           "type": "extensions",
           "location": "[resourceGroup().location]",
-          "apiVersion": "2015-06-15",
+          "apiVersion": "2018-06-30",
           "dependsOn": [
             "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]",
             "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
@@ -617,14 +617,16 @@
           "properties": {
             "publisher": "Microsoft.Powershell",
             "type": "DSC",
-            "typeHandlerVersion": "2.13",
+            "typeHandlerVersion": "2.88",
             "autoUpgradeMinorVersion": true,
             "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
             "settings": {
-              "modulesUrl": "[concat(parameters('_artifactsLocation'), 'dsc.zip')]",
-              "sasToken": "[parameters('_artifactsLocationSasToken')]",
-              "configurationFunction": "[variables('Dc1DscConfigurationFunction')]",
-              "properties": {
+              "Configuration":{
+                "uri":"[concat(parameters('_artifactsLocation'), 'dsc.zip')]",
+                "script":"DC1Config.ps1",
+                "function":"DCConfig"
+              },
+              "configurationArguments": {
                 "nodeName": "localhost",
                 "domainName": "[parameters('domain1Name')]",
                 "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
@@ -636,10 +638,14 @@
                 "DataDriveLetter": "F",
                 "ForwarderIPaddress": "[reference(variables('DC2networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]",
                 "ForwarderDomain": "[parameters('domain2Name')]"
+
+              },
+              "configurationData":{
+                "url":"[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]"
+
               }
             },
             "protectedSettings": {
-              "dataBlobUri": "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]",
               "items": {
                 "DomainAdminPassword": "[parameters('AdminPassword')]"
               }
