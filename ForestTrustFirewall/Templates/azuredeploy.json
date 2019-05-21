@@ -620,7 +620,7 @@
             "autoUpgradeMinorVersion": true,
             "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
             "settings": {
-              "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', 'dsc.zip')]",
+              "modulesUrl": "[concat(parameters('_artifactsLocation'), 'dsc.zip')]",
               "sasToken": "[parameters('_artifactsLocationSasToken')]",
               "configurationFunction": "[variables('Dc1DscConfigurationFunction')]",
               "properties": {
@@ -749,7 +749,7 @@
             "forceUpdateTag": "[parameters('DCConfig2UpdateTagVersion')]",
             "settings": {
               "DCConfigArchiveFileName": "dsc.zip",
-              "modulesUrl": "[concat(parameters('_artifactsLocation'), '/', variables('DCConfigArchiveFileName'))]",
+              "modulesUrl": "[concat(parameters('_artifactsLocation'), variables('DCConfigArchiveFileName'))]",
               "sasToken": "[parameters('_artifactsLocationSasToken')]",
               "configurationFunction": "[variables('Dc2DscConfigurationFunction')]",
               "properties": {
