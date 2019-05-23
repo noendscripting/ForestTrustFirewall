@@ -124,23 +124,27 @@
       "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[0])]",
       "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[1])]"
     ],
-    "DC1networkInterfaceName": "[concat(variables('VMNames')[0],'NIC')]",
-    "DC1publicIpAddressName": "[concat(variables('VMNames')[0],'PUBLICIP')]",
-    "DC2publicIpAddressName": "[concat(variables('VMNames')[1],'PUBLICIP')]",
-    "DC2networkInterfaceName": "[concat(variables('VMNames')[1],'NIC')]",
-    "FIM1publicIpAddressName": "[concat(variables('VMNames')[2],'PUBLICIP')]",
-    "FIM1networkInterfaceName": "[concat(variables('VMNames')[2],'NIC')]",
-    "ADMTpublicIpAddressName": "[concat(variables('VMNames')[3],'PUBLICIP')]",
-    "ADMTnetworkInterfaceName": "[concat(variables('VMNames')[3],'NIC')]",
+    "networkInterfacename":[
+      "[concat(variables('VMNames')[1],'NIC')]",
+      "[concat(variables('VMNames')[0],'NIC')]",
+      "[concat(variables('VMNames')[2],'NIC')]",
+      "[concat(variables('VMNames')[3],'NIC')]"
+
+    ],
+    "publicIpAddressName":[ 
+      "[concat(variables('VMNames')[0],'PUBLICIP')]",
+     "[concat(variables('VMNames')[1],'PUBLICIP')]",
+     "[concat(variables('VMNames')[2],'PUBLICIP')]",
+     "[concat(variables('VMNames')[3],'PUBLICIP')]"
+    ],
     "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
     "DC2SubnetIPArray": "[split(parameters('DC2-SubnetPrefix'),'.')]",
     "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
     "DNSServerIP2": "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','4')]",
-    "DCConfigArchiveFolder": "DSC",
     "DCConfigArchiveFileName": "dsc.zip",
     "DCConfigDataFileName": "DCConfig.psd1",
-    "Dc1DscConfigurationFunction": "DC1Config.ps1\\DcConfig",
-    "Dc2DscConfigurationFunction": "DC1Config.ps1\\DcConfig",
+    "DscConfigurationFunction": "DcConfig",
+    "DscConfigurationScript": "DC1Config.ps1",
     "projectName": "ForestTrustFirewall",
     "CustomScriptScriptFolder": "CustomScripts",
     "CustomScriptScriptFileName": "CustomScript.ps1",
@@ -150,75 +154,59 @@
       "Groups.csv",
       "Members.csv",
       "OUs.csv"
-    ]
+    ],
+    "DCSConfigParams":{
+      "Params":[
+        {
+          
+          "domainName": "[parameters('domain1Name')]",
+          "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
+          "DataDiskNumber": "2",
+          "DataDriveLetter": "F",
+          "ForwarderIPaddress": "[variables('DNSServerIP2')]",
+          "ForwarderDomain": "[parameters('domain2Name')]"
+        },
+        {
+            "domainName": "[parameters('domain2Name')]",
+            "NetBiosDomainname": "[parameters('NetBiosDomain2name')]",
+            "DataDiskNumber": "2",
+            "DataDriveLetter": "F",
+            "ForwarderIPaddress": "[variables('DNSServerIP1')]",
+            "ForwarderDomain": "[parameters('domain1Name')]"
+        }
+      ] 
+    }
 
   },
   "resources": [
-    //DC1 Public IP
     {
-      "name": "[variables('DC1publicIpAddressName')]",
-      "Type": "Microsoft.Network/publicIpAddresses",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "DCP1ublicIP"
-      },
-      "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
-        "dnsSettings": {
-          "domainNameLabel": "[concat(toLower(variables('VMNames')[0]),'access101')]"
-        }
+      "name":"[concat(variables('publicIpAddressName')[copyIndex()],deployment().name)]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties":{
+          "mode":"Incremental",
+          "templateLink":{
+              "uri": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-publicIP.json"
+          },
+          "parameters":{
+              "publicIPData":{
+                "value":{
+                  "vmName":"[variables('VMNames')[copyIndex()]]",
+                  "Sku": "Basic",
+                  "Allocation":"Dynamic"
+                }
 
-      }
-    },
-    //DC2 Public IP
-    {
-      "name": "[variables('DC2publicIpAddressName')]",
-      "Type": "Microsoft.Network/publicIpAddresses",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "DCP2ublicIP"
+              }
+          }
       },
-      "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
-        "dnsSettings": {
-          "domainNameLabel": "[concat(toLower(variables('VMNames')[1]),'access101')]"
-        }
+      "copy": {
+        "name":"publicIP",
+        "count": 4,
+        "mode": "Parallel"
       }
-    },
-    //FIM1 Public IP
-    {
-      "name": "[variables('FIM1publicIpAddressName')]",
-      "Type": "Microsoft.Network/publicIpAddresses",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "FIM1PublicIP"
-      },
-      "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
-        "dnsSettings": {
-          "domainNameLabel": "[concat(toLower(variables('VMNames')[2]),'access101')]"
-        }
-      }
-    },
-    //ADMT Public IP
-    {
-      "name": "[variables('ADMTpublicIpAddressName')]",
-      "Type": "Microsoft.Network/publicIpAddresses",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "tags": {
-        "displayName": "ADMTPublicIP"
-      },
-      "Properties": {
-        "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
-        "dnsSettings": {
-          "domainNameLabel": "[concat(toLower(variables('VMNames')[3]),'access101')]"
-        }
-      }
-    },
+
+  },
+   
     // NSG DC1
     {
       "comments": "# NSG",
@@ -418,13 +406,14 @@
     },
     //DC1 NIC
     {
-      "name": "[variables('DC1networkInterfaceName')]",
+      "name": "[variables('networkInterfacename')[1]]",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC1publicIpAddressName'))]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]"
+        //"[concat('Microsoft.Network/publicIpAddresses/',variables('publicIpAddressName')[0])]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[0],deployment().name)]"
       ],
       "tags": {
         "displayName": "DC1NIC"
@@ -441,7 +430,7 @@
               "privateIPAllocationMethod": "Static",
               "privateIPAddress": "[variables('DNSServerIP1')]",
               "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC1publicIpAddressName'))]"
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[0])]"
               }
             }
           }
@@ -449,15 +438,16 @@
 
       }
     },
+    //DC2 NIC
     {
-      "name": "[variables('DC2networkInterfaceName')]",
+      "name": "[variables('networkInterfacename')[0]]",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/publicIpAddresses/',variables('DC2publicIpAddressName'))]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]" //,
-        //"[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
+        //"[concat('Microsoft.Network/publicIpAddresses/',variables('publicIpAddressName')[1])]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[1],deployment().name)]"
       ],
       "tags": {
         "displayName": "DC2NIC"
@@ -474,21 +464,22 @@
               "privateIPAllocationMethod": "Static",
               "privateIPAddress": "[variables('DNSServerIP2')]",
               "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('DC2publicIpAddressName'))]"
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('networkInterfacename')[1])]"
               }
             }
           }
         ]
       }
     },
+    //FIM NIC
     {
-      "name": "[variables('FIM1networkInterfaceName')]",
+      "name": "[variables('networkInterfacename')[3]]",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "dependsOn": [
         "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
-        "[concat('Microsoft.Network/publicIpAddresses/',variables('FIM1publicIpAddressName'))]"
+        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[3],deployment().name)]"
       ],
       "tags": {
         "displayName": "FIM1"
@@ -504,23 +495,24 @@
               },
               "privateIPAllocationMethod": "Dynamic",
               "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('FIM1publicIpAddressName'))]"
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[3])]"
               }
             }
           }
         ],
         "dnsSettings": {
-          "dnsServers": [ "[reference(variables('DC2networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]" ]
+          "dnsServers": "[reference(variables('networkInterfacename')[0]).ipConfigurations[0].properties.privateIPAddress]"
         }
       }
     },
+    //ADMT NIC
     {
-      "name": "[variables('ADMTnetworkInterfaceName')]",
+      "name": "[variables('networkInterfacename')[2]]",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2015-06-15",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/publicIpAddresses/', variables('ADMTpublicIpAddressName'))]"
+        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[2],deployment().name)]"
       ],
       "tags": {
         "displayName": "BaseVMNIC"
@@ -536,13 +528,13 @@
               },
               "privateIPAllocationMethod": "Dynamic",
               "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('ADMTpublicIpAddressName'))]"
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[2])]"
               }
             }
           }
         ],
         "dnsSettings": {
-          "dnsServers": [ "[reference(variables('DC1networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]" ]
+          "dnsServers": "[reference(variables('networkInterfacename')[1]).ipConfigurations[0].properties.privateIPAddress]"
         }
 
       }
@@ -554,7 +546,7 @@
       "apiVersion": "2017-03-30",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/networkInterfaces/', variables('DC1networkInterfaceName'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfacename')[1])]"
       ],
       "tags": {
         "displayName": "DC1"
@@ -594,7 +586,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('DC1networkInterfaceName'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfacename')[1])]"
             }
           ]
 
@@ -602,56 +594,7 @@
 
       },
       "resources": [
-        {
-          "name": "DCConfig1",
-          "type": "extensions",
-          "location": "[resourceGroup().location]",
-          "apiVersion": "2019-03-01",
-          "dependsOn": [
-            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]",
-            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
-          ],
-          "tags": {
-            "displayName": "DCConfig1"
-          },
-          "properties": {
-            "publisher": "Microsoft.Powershell",
-            "type": "DSC",
-            "typeHandlerVersion": "2.76",
-            "autoUpgradeMinorVersion": true,
-            "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
-            "settings": {
-              "configuration":{
-                "uri":"[concat(parameters('_artifactsLocation'), 'dsc.zip')]",
-                "script":"DC1Config.ps1",
-                "function":"DCConfig"
-              },
-              "configurationArguments": {
-                "nodeName": "localhost",
-                "domainName": "[parameters('domain1Name')]",
-                "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
-                "DomainAdminCredentials": {
-                  "UserName": "[parameters('AdminUserName')]",
-                  "Password": "PrivateSettingsRef:DomainAdminPassword"
-                },
-                "DataDiskNumber": "2",
-                "DataDriveLetter": "F",
-                "ForwarderIPaddress": "[reference(variables('DC2networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]",
-                "ForwarderDomain": "[parameters('domain2Name')]"
-
-              },
-              "configurationData":{
-                "url":"[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]"
-
-              }
-            },
-            "protectedSettings": {
-              "items": {
-                "DomainAdminPassword": "[parameters('AdminPassword')]"
-              }
-            }
-          }
-        },
+        
         {
           "name": "ImportDC1",
           "type": "extensions",
@@ -691,7 +634,7 @@
       "apiVersion": "2017-03-30",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/networkInterfaces/', variables('DC2networkInterfaceName'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfacename')[0])]"
       ],
       "tags": {
         "displayName": "DC2"
@@ -729,7 +672,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('DC2networkInterfaceName'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfacename')[0])]"
             }
           ]
 
@@ -737,50 +680,6 @@
 
       },
       "resources": [
-        {
-          "name": "DCConfig2",
-          "type": "extensions",
-          "location": "[resourceGroup().location]",
-          "apiVersion": "2015-06-15",
-          "dependsOn": [
-            "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]"
-          ],
-          "tags": {
-            "displayName": "DCConfig2"
-          },
-          "properties": {
-            "publisher": "Microsoft.Powershell",
-            "type": "DSC",
-            "typeHandlerVersion": "2.9",
-            "autoUpgradeMinorVersion": true,
-            "forceUpdateTag": "[parameters('DCConfig2UpdateTagVersion')]",
-            "settings": {
-              "DCConfigArchiveFileName": "dsc.zip",
-              "modulesUrl": "[concat(parameters('_artifactsLocation'), variables('DCConfigArchiveFileName'))]",
-              "sasToken": "[parameters('_artifactsLocationSasToken')]",
-              "configurationFunction": "[variables('Dc2DscConfigurationFunction')]",
-              "properties": {
-                "nodeName": "localhost",
-                "domainName": "[parameters('domain2Name')]",
-                "NetBiosDomainname": "[parameters('NetBiosDomain2name')]",
-                "DomainAdminCredentials": {
-                  "UserName": "[parameters('AdminUserName')]",
-                  "Password": "PrivateSettingsRef:DomainAdminPassword"
-                },
-                "DataDiskNumber": "2",
-                "DataDriveLetter": "F",
-                "ForwarderIPaddress": "[reference(variables('DC1networkInterfaceName')).ipConfigurations[0].properties.privateIPAddress]",
-                "ForwarderDomain": "[parameters('domain1Name')]"
-              }
-            },
-            "protectedSettings": {
-              "dataBlobUri": "[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]",
-              "items": {
-                "DomainAdminPassword": "[parameters('AdminPassword')]"
-              }
-            }
-          }
-        },
         {
           "name": "ImportDC2",
           "type": "extensions",
@@ -820,7 +719,7 @@
       "apiVersion": "2017-03-30",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/networkInterfaces/', variables('FIM1networkInterfaceName'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfacename')[2])]"
       ],
       "tags": {
         "displayName": "FIM1"
@@ -863,7 +762,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('FIM1networkInterfaceName'))]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfacename')[3])]"
             }
           ]
 
@@ -907,7 +806,7 @@
       "apiVersion": "2017-03-30",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/networkInterfaces/', variables('ADMTnetworkInterfaceName'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfacename')[3])]"
       ],
       "tags": {
         "displayName": "ADMT"
@@ -986,6 +885,62 @@
           }
         }
       ]
+    },
+    //DSC Extension
+    {
+      "name":"[concat(variables('VMNames')[copyIndex()],'/DCConfig',add(copyIndex(),1))]",
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2019-03-01",
+      "location":"[resourceGroup().location]",
+      "tags": {
+        "DisplayName":"DCSextension"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]",
+        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]"
+      ],
+      "properties":{
+        "publisher": "Microsoft.Powershell",
+        "type": "DSC",
+        "typeHandlerVersion": "2.76",
+        "autoUpgradeMinorVersion": true,
+        "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
+        "settings": {
+          "configuration":{
+            "url":"[concat(parameters('_artifactsLocation'),variables('DCConfigArchiveFileName'))]",
+            "script":"[variables('DscConfigurationScript')]",
+            "function":"[variables('DscConfigurationFunction')]"
+          },
+          "configurationArguments": {
+            "nodeName": "localhost",
+            "domainName": "[variables('DCSConfigParams').Params[copyIndex()].domainName]",
+            "NetBiosDomainname": "[variables('DCSConfigParams').Params[copyIndex()].NetBiosDomainname]",
+            "DomainAdminCredentials": {
+              "UserName": "[parameters('AdminUserName')]",
+              "Password": "PrivateSettingsRef:DomainAdminPassword"
+            },
+            "DataDiskNumber": "[variables('DCSConfigParams').Params[copyIndex()].DataDiskNumber]",
+            "DataDriveLetter": "[variables('DCSConfigParams').Params[copyIndex()].DataDriveLetter]",
+            "ForwarderIPaddress": "[variables('DCSConfigParams').Params[copyIndex()].ForwarderIPaddress]",
+            "ForwarderDomain": "[variables('DCSConfigParams').Params[copyIndex()].ForwarderDomain]"
+
+          },
+          "configurationData":{
+            "url":"[concat(parameters('repositoryPath'),'/',variables('projectName'), '/DSC/', variables('DCConfigDataFileName'))]"
+
+          }
+        },
+        "protectedSettings": {
+          "items": {
+            "DomainAdminPassword": "[parameters('AdminPassword')]"
+          }
+        }
+      },
+      "copy": {
+        "name": "DCConfig",
+        "count": 2
+      }
+
     }
 
   ],
