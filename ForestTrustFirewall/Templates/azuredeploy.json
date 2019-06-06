@@ -70,20 +70,6 @@
       "type": "string",
       "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/master"
     },
-    "DCConfig1UpdateTagVersion": {
-      "type": "string",
-      "defaultValue": "1.4",
-      "metadata": {
-        "description": "This value must be changed from a previous deployment to ensure the extension will run"
-      }
-    },
-    "DCConfig2UpdateTagVersion": {
-      "type": "string",
-      "defaultValue": "1.4",
-      "metadata": {
-        "description": "This value must be changed from a previous deployment to ensure the extension will run"
-      }
-    },
     "domain1Name": {
       "type": "string",
       "defaultValue": "contosoad.com"
@@ -99,6 +85,16 @@
     "NetBiosDomain2name": {
       "type": "string",
       "defaultValue": "fabrikam"
+    },
+    "passwordKeyVaultName": {
+      "type": "string"
+    },
+    "passwordkeyVaultRG":{
+      "type": "string"
+    },
+    "passwordKeyVaultSecret":
+    {
+      "type": "string"
     }
   },
 
@@ -119,24 +115,8 @@
 
     ],
     "vnetName": "VNET-FWLAB",
-    "VnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
-    "subnetRef": [
-      "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[0])]",
-      "[concat(variables('vnetId'), '/subnets/', variables('vnetSubnetName')[1])]"
-    ],
-    "networkInterfacename":[
-      "[concat(variables('VMNames')[1],'NIC')]",
-      "[concat(variables('VMNames')[0],'NIC')]",
-      "[concat(variables('VMNames')[2],'NIC')]",
-      "[concat(variables('VMNames')[3],'NIC')]"
-
-    ],
-    "publicIpAddressName":[ 
-      "[concat(variables('VMNames')[0],'PUBLICIP')]",
-     "[concat(variables('VMNames')[1],'PUBLICIP')]",
-     "[concat(variables('VMNames')[2],'PUBLICIP')]",
-     "[concat(variables('VMNames')[3],'PUBLICIP')]"
-    ],
+    "vnetResourceGroup":"[resourceGroup().name]",
+    "VnetID": "[resourceId(variables('VNETResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
     "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
     "DC2SubnetIPArray": "[split(parameters('DC2-SubnetPrefix'),'.')]",
     "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
@@ -155,8 +135,45 @@
       "Members.csv",
       "OUs.csv"
     ],
+    "VMBuildParams":{
+      "params":[
+        {
+          "virtualMachineName":"DC1",
+          "nicType":"Public",
+          "subnetName":"[variables('vnetSubnetName')[0]]",
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-noDNS-nic.json",
+          "DnsIPAddress":"",
+          "StaticIP":"[variables('DNSServerIP1')]"
+        },
+        {
+          "virtualMachineName":"DC2",
+          "nicType":"Public",
+          "subnetName":"[variables('vnetSubnetName')[1]]",
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-noDNS-nic.json",
+          "DnsIPAddress":"",
+          "StaticIP":"[variables('DNSServerIP2')]"
+        },
+        {
+          "virtualMachineName":"FM1",
+          "nicType":"Public",
+          "subnetName":"[variables('vnetSubnetName')[1]]",
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/dynamic-DNS-nic.json",
+          "DnsIPAddress":"[variables('DNSServerIP2')]",
+          "StaticIP":""
+        },
+        {
+          "virtualMachineName":"ADMT",
+          "nicType":"Public",
+          "subnetName":"[variables('vnetSubnetName')[0]]",
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/dynamic-DNS-nic.json",
+          "DnsIPAddress":"[variables('DNSServerIP1')]",
+          "StaticIP":""
+        }
+      ]
+    },
+    "passwordKeyVaultId":"[resourceId(parameters('passwordkeyVaultRG'),'Microsoft.KeyVault/vaults',parameters('passwordKeyVaultName'))]",
     "DCSConfigParams":{
-      "Params":[
+      "params":[
         {
           
           "domainName": "[parameters('domain1Name')]",
@@ -179,33 +196,6 @@
 
   },
   "resources": [
-    {
-      "name":"[concat(variables('publicIpAddressName')[copyIndex()],deployment().name)]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2017-05-10",
-      "properties":{
-          "mode":"Incremental",
-          "templateLink":{
-              "uri": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-publicIP.json"
-          },
-          "parameters":{
-              "publicIPData":{
-                "value":{
-                  "vmName":"[variables('VMNames')[copyIndex()]]",
-                  "Sku": "Basic",
-                  "Allocation":"Dynamic"
-                }
-
-              }
-          }
-      },
-      "copy": {
-        "name":"publicIP",
-        "count": 4,
-        "mode": "Parallel"
-      }
-
-  },
    
     // NSG DC1
     {
@@ -404,142 +394,71 @@
         ]
       }
     },
-    //DC1 NIC
-    {
-      "name": "[variables('networkInterfacename')[1]]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
+  
+    { "name": "[concat(deployment().name,variables('VMBuildParams').params[copyIndex()].virtualMachineName)]",
       "dependsOn": [
-        //"[concat('Microsoft.Network/publicIpAddresses/',variables('publicIpAddressName')[0])]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
-        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[0],deployment().name)]"
+        "[concat('Microsoft.Network/virtualNetworks/',variables('vnetName'))]"
       ],
-      "tags": {
-        "displayName": "DC1NIC"
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "copy":{
+        "count":4,
+        "name": "serverbuild"
       },
-      "properties": {
-        "primary": true,
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[variables('subnetRef')[0]]"
+      "properties":{
+        "mode":"Incremental",
+        "templateLink":{
+          "uri": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-vm.json"
+        },
+        "parameters":{
+          "virtualMachineName": {
+            "value": "[variables('VMBuildParams').params[copyIndex()].virtualMachineName]"
+          },
+          "virtualMachineSize": {
+            "value": "[parameters('virtualMachineSize')]"
+          },
+          "adminUsername": {
+            "value": "[parameters('adminUsername')]"
+          },
+          "adminPassword": {
+            "reference":{
+              "KeyVault":{
+                "id":"[variables('passwordKeyVaultID')]"
               },
-              "privateIPAllocationMethod": "Static",
-              "privateIPAddress": "[variables('DNSServerIP1')]",
-              "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[0])]"
-              }
+              "secretname":"[parameters('passwordKeyVaultSecret')]"
             }
-          }
-        ]
-
-      }
-    },
-    //DC2 NIC
-    {
-      "name": "[variables('networkInterfacename')[0]]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "dependsOn": [
-        //"[concat('Microsoft.Network/publicIpAddresses/',variables('publicIpAddressName')[1])]",
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
-        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[1],deployment().name)]"
-      ],
-      "tags": {
-        "displayName": "DC2NIC"
-      },
-      "properties": {
-        "primary": true,
-        "ipConfigurations": [
+          },
+          "sku": {
+            "value": "[parameters('sku')]"
+          },
+          "nicType":{
+            "value": "[variables('VMBuildParams').params[copyIndex()].nicType]"
+          },
+          "VNETResourceGroup":
           {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[variables('subnetRef')[1]]"
-              },
-              "privateIPAllocationMethod": "Static",
-              "privateIPAddress": "[variables('DNSServerIP2')]",
-              "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('networkInterfacename')[1])]"
-              }
-            }
+            "value": "[variables('vnetResourceGroup')]"
+          },
+          "VNET": {
+            "value": "[variables('vnetName')]"
+          },
+          "subnetName":{
+            "value": "[variables('VMBuildParams').params[copyIndex()].subnetName]"
+          },
+          "nicTemplateLink": {
+            "value":"[variables('VMBuildParams').params[copyIndex()].nicTemplateLink]"
+          },
+          "StaticIP":{
+            "value":"[variables('VMBuildParams').params[copyIndex()].staticIp]"
+          },
+          "DnsIPAddress":{
+            "value":"[variables('VMBuildParams').params[copyIndex()].dnsipaddress]"
           }
-        ]
-      }
-    },
-    //FIM NIC
-    {
-      "name": "[variables('networkInterfacename')[3]]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "dependsOn": [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
-        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[3],deployment().name)]"
-      ],
-      "tags": {
-        "displayName": "FIM1"
-      },
-      "properties": {
-        "primary": true,
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[variables('subnetRef')[1]]"
-              },
-              "privateIPAllocationMethod": "Dynamic",
-              "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[3])]"
-              }
-            }
-          }
-        ],
-        "dnsSettings": {
-          "dnsServers": "[reference(variables('networkInterfacename')[0]).ipConfigurations[0].properties.privateIPAddress]"
         }
       }
-    },
-    //ADMT NIC
-    {
-      "name": "[variables('networkInterfacename')[2]]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2015-06-15",
-      "location": "[resourceGroup().location]",
-      "dependsOn": [
-        "[concat('Microsoft.Resources/deployments/',variables('publicIpAddressName')[2],deployment().name)]"
-      ],
-      "tags": {
-        "displayName": "BaseVMNIC"
-      },
-      "properties": {
-        "primary": true,
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "subnet": {
-                "id": "[variables('subnetRef')[0]]"
-              },
-              "privateIPAllocationMethod": "Dynamic",
-              "publicIpAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')[2])]"
-              }
-            }
-          }
-        ],
-        "dnsSettings": {
-          "dnsServers": "[reference(variables('networkInterfacename')[1]).ipConfigurations[0].properties.privateIPAddress]"
-        }
 
-      }
-    },
-    //DC1
+    }//,
+
+   /*  //DC1
     {
       "name": "[variables('VMNames')[0]]",
       "type": "Microsoft.Compute/virtualMachines",
@@ -595,7 +514,7 @@
       },
       "resources": [
         
-        {
+         {
           "name": "ImportDC1",
           "type": "extensions",
           "location": "[resourceGroup().location]",
@@ -680,7 +599,7 @@
 
       },
       "resources": [
-        {
+         {
           "name": "ImportDC2",
           "type": "extensions",
           "location": "[resourceGroup().location]",
@@ -709,7 +628,7 @@
               "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File ',  variables('CustomScriptScriptFileName'))]"
             }
           }
-        }
+        } 
       ]
     },
     //FIM1
@@ -762,7 +681,7 @@
         "networkProfile": {
           "networkInterfaces": [
             {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfacename')[3])]"
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfacename')[2])]"
             }
           ]
 
@@ -771,7 +690,7 @@
       },
       "resources": [
         // Join domain - Json AD Domain Extension
-        {
+         {
           "comments": "Join domain - JsonADDomainExtension",
           "apiVersion": "2015-06-15",
           "type": "extensions",
@@ -858,7 +777,7 @@
       },
       "resources": [
         // Join domain - Json AD Domain Extension
-        {
+         {
           "comments": "Join domain - JsonADDomainExtension",
           "apiVersion": "2015-06-15",
           "type": "extensions",
@@ -883,10 +802,10 @@
               "Password": "[parameters('AdminPassword')]"
             }
           }
-        }
+        } 
       ]
-    },
-    //DSC Extension
+    } , */
+  /*   //DSC Extension
     {
       "name":"[concat(variables('VMNames')[copyIndex()],'/DCConfig',add(copyIndex(),1))]",
       "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -904,7 +823,6 @@
         "type": "DSC",
         "typeHandlerVersion": "2.76",
         "autoUpgradeMinorVersion": true,
-        "forceUpdateTag": "[parameters('DCConfig1UpdateTagVersion')]",
         "settings": {
           "configuration":{
             "url":"[concat(parameters('_artifactsLocation'),variables('DCConfigArchiveFileName'))]",
@@ -941,7 +859,7 @@
         "count": 2
       }
 
-    }
+    } */
 
   ],
     "outputs": {
