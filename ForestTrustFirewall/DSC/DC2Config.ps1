@@ -17,7 +17,7 @@ Configuration DcConfig
 
 	)
 
-	Import-DscResource -ModuleName PSDesiredStateConfiguration, xActiveDirectory, xStorage, xComputerManagement,xNetworking, xTimeZone
+	Import-DscResource -ModuleName PSDesiredStateConfiguration, xActiveDirectory, StorageDSC, xComputerManagement,xNetworking, xTimeZone
 	
 
 
@@ -80,17 +80,17 @@ Configuration DcConfig
 			Name   = 'RSAT-Role-Tools'
 		}      
 
-		xWaitForDisk Wait_Data_Disk
+		WaitForDisk Wait_Data_Disk
 		{
-			DiskNumber = $DataDiskNumber
+			DiskId = $DataDiskNumber
 			RetryCount = 3
 			RetryIntervalSec = 60
 			DependsOn = '[WindowsFeature]RSAT_Role_Tools'
 		}
 
-		xDisk Data_Disk
+		Disk Data_Disk
 		{
-			DiskNumber = $DataDiskNumber
+			DiskId = $DataDiskNumber
 			DriveLetter = $DataDriveLetter
 			AllocationUnitSize = 4096
 			DependsOn = '[xWaitforDisk]Wait_Data_Disk'

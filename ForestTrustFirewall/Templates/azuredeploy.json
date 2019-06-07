@@ -120,7 +120,7 @@
     "DCConfigArchiveFileName": "dsc.zip",
     "DCConfigDataFileName": "DCConfig.psd1",
     "DscConfigurationFunction": "DcConfig",
-    "DscConfigurationScript": "DC1Config.ps1",
+    "DscConfigurationScript": "DCConfig.ps1",
     "projectName": "ForestTrustFirewall",
     "CustomScriptScriptFolder": "CustomScripts",
     "CustomScriptScriptFileName": "CustomScript.ps1",
