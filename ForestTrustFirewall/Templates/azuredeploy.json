@@ -81,7 +81,10 @@
     },
     "passwordKeyVaultSecret":
     {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "value": "of admin password"
+      }
     }
   },
 
