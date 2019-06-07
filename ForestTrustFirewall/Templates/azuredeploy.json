@@ -394,7 +394,7 @@
         ]
       }
     },
-  
+    //VM Deploy
     { "name": "[concat(deployment().name,variables('VMBuildParams').params[copyIndex()].virtualMachineName)]",
       "dependsOn": [
         "[concat('Microsoft.Network/virtualNetworks/',variables('vnetName'))]"
