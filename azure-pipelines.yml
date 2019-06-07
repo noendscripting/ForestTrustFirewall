@@ -5,6 +5,10 @@
 
 trigger:
 - master
+- task: PublishPipelineArtifact@0
+  inputs:
+    artifactName: 'templates'
+    targetPath: 'templates'
 
 pool:
   vmImage: 'ubuntu-latest'
