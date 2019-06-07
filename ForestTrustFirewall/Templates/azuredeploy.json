@@ -5,7 +5,7 @@
 
     "virtualMachineSize": {
       "type": "string",
-      "defaultValue": "Standard_D2_v2"
+      "defaultValue": "Standard_B2s"
     },
     "adminUsername": {
       "type": "string",
@@ -53,20 +53,7 @@
     "DC2-SubnetPrefix": {
       "type": "string"
     },
-    "_artifactsLocation": {
-      "type": "string",
-      "metadata": {
-        "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
-      },
-      "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/azdevops1.0/ForestTrustFirewall/DSC/"
-    },
-    "_artifactsLocationSasToken": {
-      "type": "securestring",
-      "metadata": {
-        "description": "Auto-generated token to access _artifactsLocation"
-      }
-    },
-    "repositoryPath": {
+      "repositoryPath": {
       "type": "string",
       "defaultValue": "https://raw.githubusercontent.com/noendscripting/ForestTrustFirewall/master"
     },
@@ -114,13 +101,19 @@
       "NSG-DC2"
 
     ],
+    "vmTemplateURI":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/vm-",
     "vnetName": "VNET-FWLAB",
     "vnetResourceGroup":"[resourceGroup().name]",
     "VnetID": "[resourceId(variables('VNETResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
     "DC1SubnetIPArray": "[split(parameters('DC1-SubnetPrefix'),'.')]",
     "DC2SubnetIPArray": "[split(parameters('DC2-SubnetPrefix'),'.')]",
-    "DNSServerIP1": "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
-    "DNSServerIP2": "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','4')]",
+    "StaticIPList":[
+      "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','4')]",
+      "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','4')]",
+      "[concat(variables('DC1SubnetIPArray')[0],'.',variables('DC1SubnetIPArray')[1],'.',variables('DC1SubnetIPArray')[2],'.','5')]",
+      "[concat(variables('DC2SubnetIPArray')[0],'.',variables('DC2SubnetIPArray')[1],'.',variables('DC2SubnetIPArray')[2],'.','5')]"
+    ],
+
     "DCConfigArchiveFileName": "dsc.zip",
     "DCConfigDataFileName": "DCConfig.psd1",
     "DscConfigurationFunction": "DcConfig",
@@ -138,36 +131,40 @@
     "VMBuildParams":{
       "params":[
         {
+          "virtualMachineType":"dc",
           "virtualMachineName":"DC1",
           "nicType":"Public",
           "subnetName":"[variables('vnetSubnetName')[0]]",
           "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-noDNS-nic.json",
           "DnsIPAddress":"",
-          "StaticIP":"[variables('DNSServerIP1')]"
+          "StaticIP":"[variables('StaticIPList')[0]]"
         },
         {
+          "virtualMachineType":"dc",
           "virtualMachineName":"DC2",
           "nicType":"Public",
           "subnetName":"[variables('vnetSubnetName')[1]]",
           "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-noDNS-nic.json",
           "DnsIPAddress":"",
-          "StaticIP":"[variables('DNSServerIP2')]"
+          "StaticIP":"[variables('StaticIPList')[1]]"
         },
         {
           "virtualMachineName":"FM1",
+          "virtualMachineType":"base",
           "nicType":"Public",
           "subnetName":"[variables('vnetSubnetName')[1]]",
-          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/dynamic-DNS-nic.json",
-          "DnsIPAddress":"[variables('DNSServerIP2')]",
-          "StaticIP":""
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-DNS-nic.json",
+          "DnsIPAddress":"[variables('StaticIPList')[1]]",
+          "StaticIP":"[variables('StaticIPList')[3]]"
         },
         {
+          "virtualMachineType":"base",
           "virtualMachineName":"ADMT",
           "nicType":"Public",
           "subnetName":"[variables('vnetSubnetName')[0]]",
-          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/dynamic-DNS-nic.json",
-          "DnsIPAddress":"[variables('DNSServerIP1')]",
-          "StaticIP":""
+          "nicTemplateLink":"https://raw.githubusercontent.com/noendscripting/azuredeploy/master/static-DNS-nic.json",
+          "DnsIPAddress":"[variables('StaticIPList')[0]]",
+          "StaticIP":"[variables('StaticIPList')[2]]"
         }
       ]
     },
@@ -180,7 +177,7 @@
           "NetBiosDomainname": "[parameters('NetBiosDomain1name')]",
           "DataDiskNumber": "2",
           "DataDriveLetter": "F",
-          "ForwarderIPaddress": "[variables('DNSServerIP2')]",
+          "ForwarderIPaddress": "[variables('StaticIPList')[1]]",
           "ForwarderDomain": "[parameters('domain2Name')]"
         },
         {
@@ -188,7 +185,7 @@
             "NetBiosDomainname": "[parameters('NetBiosDomain2name')]",
             "DataDiskNumber": "2",
             "DataDriveLetter": "F",
-            "ForwarderIPaddress": "[variables('DNSServerIP1')]",
+            "ForwarderIPaddress": "[variables('StaticIPList')[0]]",
             "ForwarderDomain": "[parameters('domain1Name')]"
         }
       ] 
@@ -408,7 +405,7 @@
       "properties":{
         "mode":"Incremental",
         "templateLink":{
-          "uri": "https://raw.githubusercontent.com/noendscripting/azuredeploy/master/base-vm.json"
+          "uri": "[concat(variables('vmTemplateURI'),variables('VMBuildParams').params[copyIndex()].virtualMachineType,'.json')]"
         },
         "parameters":{
           "virtualMachineName": {
@@ -456,10 +453,10 @@
         }
       }
 
-    }//,
+    },
 
-   /*  //DC1
-    {
+     //DC1
+    /*{
       "name": "[variables('VMNames')[0]]",
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2017-03-30",
@@ -805,7 +802,7 @@
         } 
       ]
     } , */
-  /*   //DSC Extension
+     //DSC Extension
     {
       "name":"[concat(variables('VMNames')[copyIndex()],'/DCConfig',add(copyIndex(),1))]",
       "type": "Microsoft.Compute/virtualMachines/extensions",
@@ -815,8 +812,7 @@
         "DisplayName":"DCSextension"
       },
       "dependsOn": [
-        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[1])]",
-        "[concat('Microsoft.Compute/virtualMachines/', variables('VMNames')[0])]"
+        "[concat('Microsoft.Resources/deployments/', deployment().name,variables('VMBuildParams').params[copyIndex()].virtualMachineName)]"
       ],
       "properties":{
         "publisher": "Microsoft.Powershell",
@@ -825,22 +821,22 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "configuration":{
-            "url":"[concat(parameters('_artifactsLocation'),variables('DCConfigArchiveFileName'))]",
+            "url":"https://github.com/noendscripting/ForestTrustFirewall/raw/azdevops1.0/ForestTrustFirewall/DSC/dsc.zip",
             "script":"[variables('DscConfigurationScript')]",
             "function":"[variables('DscConfigurationFunction')]"
           },
           "configurationArguments": {
             "nodeName": "localhost",
-            "domainName": "[variables('DCSConfigParams').Params[copyIndex()].domainName]",
-            "NetBiosDomainname": "[variables('DCSConfigParams').Params[copyIndex()].NetBiosDomainname]",
+            "domainName": "[variables('DCSConfigParams').params[copyIndex()].domainName]",
+            "NetBiosDomainname": "[variables('DCSConfigParams').params[copyIndex()].NetBiosDomainname]",
             "DomainAdminCredentials": {
               "UserName": "[parameters('AdminUserName')]",
               "Password": "PrivateSettingsRef:DomainAdminPassword"
             },
-            "DataDiskNumber": "[variables('DCSConfigParams').Params[copyIndex()].DataDiskNumber]",
-            "DataDriveLetter": "[variables('DCSConfigParams').Params[copyIndex()].DataDriveLetter]",
-            "ForwarderIPaddress": "[variables('DCSConfigParams').Params[copyIndex()].ForwarderIPaddress]",
-            "ForwarderDomain": "[variables('DCSConfigParams').Params[copyIndex()].ForwarderDomain]"
+            "DataDiskNumber": "[variables('DCSConfigParams').params[copyIndex()].DataDiskNumber]",
+            "DataDriveLetter": "[variables('DCSConfigParams').params[copyIndex()].DataDriveLetter]",
+            "ForwarderIPaddress": "[variables('DCSConfigParams').params[copyIndex()].ForwarderIPaddress]",
+            "ForwarderDomain": "[variables('DCSConfigParams').params[copyIndex()].ForwarderDomain]"
 
           },
           "configurationData":{
@@ -859,7 +855,7 @@
         "count": 2
       }
 
-    } */
+    }
 
   ],
     "outputs": {
