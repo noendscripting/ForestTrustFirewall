@@ -93,7 +93,7 @@ Configuration DcConfig
 			DiskId =  $DataDiskNumber
 			DriveLetter = $DataDriveLetter
 			AllocationUnitSize = 4096
-			DependsOn = '[xWaitforDisk]Wait_Data_Disk'
+			DependsOn = '[WaitforDisk]Wait_Data_Disk'
 		}
 
 		xADDomain CreateForest 
@@ -105,7 +105,7 @@ Configuration DcConfig
 			DataBasePath = "$($DataDriveLetter):\NTDS"
 			LogPath = "$($DataDriveLetter):\NTDS"
 			SysvolPath = "$($DataDriveLetter):\SYSVOL"
-			DependsOn = '[xDisk]Data_Disk', '[WindowsFeature]ADDS_Install'
+			DependsOn = '[Disk]Data_Disk', '[WindowsFeature]ADDS_Install'
 		}
 	Script SetForwarders
 	  {
